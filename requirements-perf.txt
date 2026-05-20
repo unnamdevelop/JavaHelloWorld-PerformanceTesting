@@ -1,0 +1,5 @@
+# Python dependencies for performance pipeline runner only
+# These are NOT part of the Java application
+# Installed only during the perf-test step in CI
+requests>=2.31.0
+pyyaml>=6.0

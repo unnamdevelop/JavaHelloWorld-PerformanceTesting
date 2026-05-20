@@ -1,0 +1,16 @@
+# Maven
+target/
+*.class
+
+# Performance test results (generated, not committed)
+perf-results/
+*.jtl
+*.log
+
+# Keep this — needed for JMX cache detection
+# .perf_spec_hash   ← DO NOT ignore
+
+# IDE
+.idea/
+*.iml
+.vscode/

@@ -1,0 +1,52 @@
+# ══════════════════════════════════════════════════════════════
+# perf-config.yaml
+# Performance testing configuration for hello-world-java project.
+# Maintained by the dev team in their own repo.
+# Points to restful-booker.herokuapp.com as the test target API.
+# ══════════════════════════════════════════════════════════════
+
+team:
+  name: "hello-world-team"
+
+api:
+  # Target API for performance testing
+  # Using restful-booker as our validated live test API
+  base_url: "https://restful-booker.herokuapp.com"
+
+  # Spec URL — pulled directly from perf agent service specs
+  # The bundled spec on the server will be used automatically
+  spec_url: null
+
+  # Auth credentials for restful-booker
+  auth_username: "admin"
+
+# Load profile — baseline first (Golden Rule 1)
+# Change to 'load' after baseline passes
+profile: "baseline"
+
+# Load settings
+load:
+  threads     : 1       # single user for baseline
+  ramp_up_sec : 1
+  duration_sec: 60
+
+# SLA thresholds — set BEFORE testing (Golden Rule 3)
+sla:
+  p95_ms         : 2000
+  p99_ms         : 4000
+  error_rate_pct : 5.0
+  throughput_min : 0.5
+
+# Certificate config — not needed for restful-booker
+certs:
+  skip_ssl_verify: false
+
+# Notification — optional Slack webhook
+notify:
+  webhook_url: null
+
+# Performance agent service URL
+# Set this as GitHub Secret: PERF_AGENT_URL
+# For local testing: http://localhost:8000
+# For ngrok tunnel : https://xxxx.ngrok-free.app
+service_url: "http://localhost:8000"
