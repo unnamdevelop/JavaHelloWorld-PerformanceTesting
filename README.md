@@ -103,6 +103,8 @@ Edit `perf-config.yaml`:
 profile: "load"      # change from baseline to load
 
 load:
+
+## Updated by Raghav
   threads     : 20   # increase users
   ramp_up_sec : 40
   duration_sec: 300
