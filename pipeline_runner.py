@@ -197,6 +197,7 @@ def build_payload(cfg: dict, force_regenerate: bool,
 # ─── Main pipeline ────────────────────────────────────────────────────────────
 
 def run_pipeline(config_file: str,
+                 profile_override: str = None,
                  force_regenerate: bool = False,
                  dry_run: bool = False):
 
@@ -207,6 +208,11 @@ def run_pipeline(config_file: str,
 
     # ── Load config ───────────────────────────────────────────────────────
     cfg = load_config(config_file)
+
+    # Apply profile override from CLI if provided
+    if profile_override:
+        cfg["profile"] = profile_override
+        print(f"[pipeline] Profile overridden to: {profile_override}")
 
     service_url = os.environ.get(
         "PERF_AGENT_URL",
@@ -278,6 +284,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--config", default="perf-config.yaml",
                         help="Path to perf-config.yaml")
+    parser.add_argument("--profile", default=None,
+                        choices=["baseline", "load", "stress", "spike", "soak"],
+                        help="Override load profile from perf-config.yaml")
     parser.add_argument("--force-regenerate", action="store_true",
                         help="Force JMX regeneration even if spec unchanged")
     parser.add_argument("--dry-run", action="store_true",
@@ -286,6 +295,7 @@ if __name__ == "__main__":
 
     run_pipeline(
         config_file      = args.config,
+        profile_override = args.profile,
         force_regenerate = args.force_regenerate,
         dry_run          = args.dry_run,
     )
