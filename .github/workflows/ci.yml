@@ -157,17 +157,50 @@ jobs:
           path: perf-results/
           retention-days: 30
 
-      # ── Add report summary to GitHub Actions summary page ──────────────────
+      # ── Add rich report summary to GitHub Actions summary page ───────────────
       - name: Add to job summary
         if: always()
         run: |
           echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "**Profile:** ${{ inputs.profile || 'baseline' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Spec changed:** ${{ env.SPEC_CHANGED }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Profile | ${{ inputs.profile || 'baseline' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Spec Changed | ${{ env.SPEC_CHANGED }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target API | https://restful-booker.herokuapp.com |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           if ls perf-results/*.md 1>/dev/null 2>&1; then
-            echo "### Report" >> $GITHUB_STEP_SUMMARY
-            head -40 perf-results/*.md >> $GITHUB_STEP_SUMMARY
+
+            # Extract overall result
+            OVERALL=$(grep "Overall\|PASS\|FAIL" perf-results/*.md | head -1)
+            echo "### $OVERALL" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show full metrics table
+            echo "### Metrics Table" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            # Extract table lines from markdown report
+            grep -A 100 "Metrics by Endpoint" perf-results/*.md | \
+              grep "^|" >> $GITHUB_STEP_SUMMARY || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show SLA violations
+            echo "### SLA Violations" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            grep -A 20 "SLA Violations" perf-results/*.md | \
+              grep -v "^#" | head -15 >> $GITHUB_STEP_SUMMARY || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show AI analysis summary (first 30 lines)
+            echo "### GPT-4o Analysis Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            grep -A 30 "AI Analysis" perf-results/*.md | \
+              grep -v "^#" | head -25 >> $GITHUB_STEP_SUMMARY || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "> Full HTML report with charts available in **Artifacts** below" >> $GITHUB_STEP_SUMMARY
           fi
 
       # ── Comment on PR with results ─────────────────────────────────────────
