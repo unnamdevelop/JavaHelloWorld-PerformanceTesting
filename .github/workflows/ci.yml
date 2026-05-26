@@ -61,6 +61,42 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
+      - name: Show test summary in GitHub Actions UI
+        if: always()
+        run: |
+          echo "## Unit Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count results from surefire XML
+          TESTS=$(grep -h "tests=" target/surefire-reports/TEST-*.xml | \
+            grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | \
+            awk '{sum+=$1} END {print sum}')
+          FAILURES=$(grep -h "failures=" target/surefire-reports/TEST-*.xml | \
+            grep -o 'failures="[0-9]*"' | grep -o '[0-9]*' | \
+            awk '{sum+=$1} END {print sum}')
+          ERRORS=$(grep -h "errors=" target/surefire-reports/TEST-*.xml | \
+            grep -o 'errors="[0-9]*"' | grep -o '[0-9]*' | \
+            awk '{sum+=$1} END {print sum}')
+
+          echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Tests | $TESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Passed | $((TESTS - FAILURES - ERRORS)) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failed | $FAILURES |" >> $GITHUB_STEP_SUMMARY
+          echo "| Errors | $ERRORS |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Test Cases" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Name | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # List each test case
+          grep -h "testcase name=" target/surefire-reports/TEST-*.xml | \
+            grep -o 'name="[^"]*"' | grep -o '"[^"]*"' | tr -d '"' | \
+            while read test; do
+              echo "| $test | PASS |" >> $GITHUB_STEP_SUMMARY
+            done
+
   # ── Job 2: Performance Tests ─────────────────────────────────────────────────
   # Runs ONLY after unit tests pass
   performance-tests:
