@@ -194,6 +194,163 @@ def build_payload(cfg: dict, force_regenerate: bool,
     return payload
 
 
+def generate_github_summary(service_url: str, job_id: str,
+                            state: dict, cfg: dict, output_dir: Path):
+    """
+    Generate a rich GitHub Actions Summary markdown file.
+    Reads the downloaded markdown report and creates a visual summary
+    with bar indicators directly renderable in GitHub Actions Summary tab.
+    Written to perf-results/github_summary.md which ci.yml pipes to
+    GITHUB_STEP_SUMMARY.
+    """
+    overall    = state.get("overall", "UNKNOWN")
+    violations = state.get("violations", 0)
+    profile    = cfg.get("profile", "baseline")
+    base_url   = cfg.get("api", {}).get("base_url", "")
+
+    # ── Emoji indicators ──────────────────────────────────────────────────
+    overall_emoji = "✅" if overall == "PASS" else "❌"
+    badge = "🟢 PASS" if overall == "PASS" else "🔴 FAIL"
+
+    # ── Parse metrics from downloaded markdown report ─────────────────────
+    metrics_rows = []
+    md_files = list(output_dir.glob("*.md"))
+    if md_files:
+        content = md_files[0].read_text(encoding="utf-8", errors="ignore")
+        in_table = False
+        for line in content.splitlines():
+            if "|" in line and "Endpoint" in line:
+                in_table = True
+                continue
+            if in_table and line.startswith("|---"):
+                continue
+            if in_table and line.startswith("|"):
+                metrics_rows.append(line)
+            elif in_table and not line.startswith("|"):
+                in_table = False
+
+    # ── Build bar chart from metrics ──────────────────────────────────────
+    def make_bar(value: float, max_val: float, width: int = 20) -> str:
+        """Create a unicode progress bar."""
+        if max_val == 0:
+            return "░" * width
+        filled = min(int((value / max_val) * width), width)
+        return "█" * filled + "░" * (width - filled)
+
+    # Parse metric values from table rows
+    parsed = []
+    for row in metrics_rows:
+        cols = [c.strip() for c in row.split("|") if c.strip()]
+        if len(cols) >= 7:
+            try:
+                endpoint = cols[0].replace("`", "")[:45]
+                requests = int(cols[1])
+                mean     = float(cols[2].replace("ms",""))
+                p95      = float(cols[3].replace("ms",""))
+                p99      = float(cols[4].replace("ms",""))
+                err      = float(cols[5].replace("%",""))
+                tps      = float(cols[6])
+                sla      = cols[7] if len(cols) > 7 else "?"
+                parsed.append((endpoint, requests, mean, p95, p99, err, tps, sla))
+            except (ValueError, IndexError):
+                continue
+
+    # ── Build summary markdown ────────────────────────────────────────────
+    lines = []
+
+    # Header
+    lines += [
+        f"# {overall_emoji} Performance Test Report — {badge}",
+        "",
+        f"| | |",
+        f"|---|---|",
+        f"| **Target API** | {base_url} |",
+        f"| **Profile** | {profile} |",
+        f"| **Threads** | {cfg.get('load', {}).get('threads', 1)} |",
+        f"| **Duration** | {cfg.get('load', {}).get('duration_sec', 60)}s |",
+        f"| **SLA Violations** | {violations} |",
+        f"| **Job ID** | {job_id} |",
+        "",
+        "---",
+        "",
+    ]
+
+    # Metrics table with SLA status
+    if parsed:
+        lines += [
+            "## 📊 Metrics by Endpoint",
+            "",
+            "| Endpoint | Requests | Mean | P95 | P99 | Err% | TPS | SLA |",
+            "|---|---:|---:|---:|---:|---:|---:|:---:|",
+        ]
+        for ep, req, mean, p95, p99, err, tps, sla in parsed:
+            sla_icon = "✅" if sla.strip() == "PASS" else "❌"
+            lines.append(
+                f"| `{ep}` | {req} | {mean}ms | {p95}ms | {p99}ms "
+                f"| {err}% | {tps} | {sla_icon} {sla} |"
+            )
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    # Visual bar charts using unicode
+    if parsed:
+        max_p95 = max((r[3] for r in parsed), default=1)
+        max_tps = max((r[6] for r in parsed), default=1)
+
+        lines += [
+            "## 📈 Response Time — P95 Visual",
+            "",
+            "```",
+        ]
+        for ep, req, mean, p95, p99, err, tps, sla in parsed:
+            bar   = make_bar(p95, max_p95, 30)
+            short = ep[:30].ljust(30)
+            lines.append(f"{short} |{bar}| {p95}ms")
+        lines += ["```", ""]
+
+        lines += [
+            "## ⚡ Throughput — TPS Visual",
+            "",
+            "```",
+        ]
+        for ep, req, mean, p95, p99, err, tps, sla in parsed:
+            bar   = make_bar(tps, max_tps, 30)
+            short = ep[:30].ljust(30)
+            lines.append(f"{short} |{bar}| {tps} rps")
+        lines += ["```", ""]
+
+        # Error rate summary
+        lines += [
+            "## 🔍 Error Rate Summary",
+            "",
+        ]
+        for ep, req, mean, p95, p99, err, tps, sla in parsed:
+            icon = "🟢" if err == 0 else "🔴"
+            lines.append(f"- {icon} `{ep[:50]}` — {err}%")
+        lines += ["", "---", ""]
+
+    # SLA summary
+    lines += [
+        "## 🎯 SLA Thresholds",
+        "",
+        f"- P95 must be < **{cfg.get('sla', {}).get('p95_ms', 2000)}ms**",
+        f"- P99 must be < **{cfg.get('sla', {}).get('p99_ms', 4000)}ms**",
+        f"- Error rate must be < **{cfg.get('sla', {}).get('error_rate_pct', 5.0)}%**",
+        f"- TPS must be > **{cfg.get('sla', {}).get('throughput_min', 0.5)}**",
+        "",
+        "---",
+        "",
+        "> 💡 **Full HTML report with interactive charts** is available in the",
+        "> **Artifacts** section below — download `perf-report-N` ZIP and open `report_*.html`",
+    ]
+
+    # Write to file
+    summary_file = output_dir / "github_summary.md"
+    summary_file.write_text("\n".join(lines), encoding="utf-8")
+    print(f"[pipeline] GitHub summary: {summary_file}")
+
+
 # ─── Main pipeline ────────────────────────────────────────────────────────────
 
 def run_pipeline(config_file: str,
@@ -254,11 +411,12 @@ def run_pipeline(config_file: str,
         download_reports(service_url, job_id, output_dir)
 
         # ── Update spec hash after successful run ─────────────────────────
-        # Only update hash if JMX was regenerated successfully
-        # so next run knows not to regenerate again
         if payload.get("regenerate_jmx") and spec_path.exists():
             store_hash(get_spec_hash(spec_path))
             print(f"[pipeline] Spec hash updated — JMX is current")
+
+        # ── Generate GitHub Actions Summary file ──────────────────────────
+        generate_github_summary(service_url, job_id, state, cfg, output_dir)
 
     # ── Final verdict ─────────────────────────────────────────────────────
     overall    = state.get("overall", "UNKNOWN")
