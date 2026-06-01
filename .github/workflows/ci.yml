@@ -90,11 +90,12 @@ jobs:
           echo "| Test Name | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          # List each test case
-          grep -h "testcase name=" target/surefire-reports/TEST-*.xml | \
-            grep -o 'name="[^"]*"' | grep -o '"[^"]*"' | tr -d '"' | \
+          # Extract only the test method name (first name= attribute on testcase line)
+          # Uses sed to grab name="..." before classname="..." appears
+          grep -h "<testcase " target/surefire-reports/TEST-*.xml | \
+            sed 's/.*<testcase[^>]*name="\([^"]*\)".*/\1/' | \
             while read test; do
-              echo "| $test | PASS |" >> $GITHUB_STEP_SUMMARY
+              echo "| $test | ✅ PASS |" >> $GITHUB_STEP_SUMMARY
             done
 
   # ── Job 2: Performance Tests ─────────────────────────────────────────────────
