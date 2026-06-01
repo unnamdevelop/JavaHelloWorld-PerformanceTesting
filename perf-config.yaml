@@ -10,12 +10,13 @@ team:
 
 api:
   # Target API for performance testing
-  # Using restful-booker as our validated live test API
   base_url: "https://restful-booker.herokuapp.com"
 
-  # Spec URL — pulled directly from perf agent service specs
-  # The bundled spec on the server will be used automatically
-  spec_url: null
+  # Spec file — lives in THIS repo, not on the server
+  # pipeline_runner.py reads this file, computes SHA256 hash
+  # for change detection, and sends content to perf agent
+  # No server-side spec dependency — fully self-contained
+  spec_file: "openapi.yaml"
 
   # Auth credentials for restful-booker
   auth_username: "admin"

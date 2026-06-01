@@ -2,13 +2,15 @@
 target/
 *.class
 
-# Performance test results (generated, not committed)
+# Performance test results (generated — not committed)
 perf-results/
 *.jtl
 *.log
 
-# Keep this — needed for JMX cache detection
-# .perf_spec_hash   ← DO NOT ignore
+# Keep these — essential for performance pipeline
+# openapi.yaml        ← spec sent to perf agent per run
+# .perf_spec_hash     ← tracks last JMX generation hash
+# perf-config.yaml    ← team perf configuration
 
 # IDE
 .idea/

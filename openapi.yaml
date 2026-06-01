@@ -1,0 +1,131 @@
+openapi: 3.0.3
+info:
+  title: Restful Booker API
+  description: >
+    Live booking API used as the performance test target.
+    Maintained in the dev repo so the perf agent has no
+    dependency on any server-side spec file.
+  version: "1.0"
+
+servers:
+  - url: https://restful-booker.herokuapp.com
+
+paths:
+
+  /ping:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      responses:
+        '201': { description: Created }
+
+  /auth:
+    post:
+      operationId: createToken
+      summary: Create authentication token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string, example: admin }
+                password: { type: string, example: password123 }
+      responses:
+        '200': { description: OK }
+
+  /booking:
+    get:
+      operationId: getBookingIds
+      summary: Get all booking IDs
+      responses:
+        '200': { description: OK }
+    post:
+      operationId: createBooking
+      summary: Create a new booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstname:    { type: string, example: James }
+                lastname:     { type: string, example: Brown }
+                totalprice:   { type: integer, example: 150 }
+                depositpaid:  { type: boolean, example: true }
+                bookingdates:
+                  type: object
+                  properties:
+                    checkin:  { type: string, example: "2024-01-01" }
+                    checkout: { type: string, example: "2024-01-07" }
+      responses:
+        '200': { description: OK }
+
+  /booking/{id}:
+    get:
+      operationId: getBooking
+      summary: Get booking by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+    put:
+      operationId: updateBooking
+      summary: Full update of a booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstname:    { type: string, example: James }
+                lastname:     { type: string, example: Brown }
+                totalprice:   { type: integer, example: 200 }
+                depositpaid:  { type: boolean, example: true }
+                bookingdates:
+                  type: object
+                  properties:
+                    checkin:  { type: string, example: "2024-01-01" }
+                    checkout: { type: string, example: "2024-01-07" }
+      responses:
+        '200': { description: OK }
+    patch:
+      operationId: partialUpdateBooking
+      summary: Partial update of a booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstname: { type: string, example: James }
+                lastname:  { type: string, example: Brown }
+      responses:
+        '200': { description: OK }
+    delete:
+      operationId: deleteBooking
+      summary: Delete a booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '201': { description: Created }
