@@ -90,10 +90,10 @@ jobs:
           echo "| Test Name | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          # Extract only the test method name (first name= attribute on testcase line)
-          # Uses sed to grab name="..." before classname="..." appears
+          # Extract test method name only (not classname)
           grep -h "<testcase " target/surefire-reports/TEST-*.xml | \
-            sed 's/.*<testcase[^>]*name="\([^"]*\)".*/\1/' | \
+            grep -oP '(?<=\bname=")[^"]+' | \
+            grep -v '^\(com\|org\|net\)\.' | \
             while read test; do
               echo "| $test | ✅ PASS |" >> $GITHUB_STEP_SUMMARY
             done
