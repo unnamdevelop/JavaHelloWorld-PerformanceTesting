@@ -1,0 +1,401 @@
+openapi: 3.0.3
+info:
+  title: Restful-Booker API
+  description: >
+    Live public API for hotel booking operations.
+    Base URL: https://restful-booker.herokuapp.com
+    - No signup required
+    - Resets every 10 minutes (safe to CREATE/UPDATE/DELETE freely)
+    - Has intentional bugs — great for SLA violation detection
+    - Auth token required for PUT / PATCH / DELETE
+  version: "1.0"
+  contact:
+    name: Mark Winteringham
+    url: https://restful-booker.herokuapp.com
+
+servers:
+  - url: https://restful-booker.herokuapp.com
+    description: Live public server (resets every 10 min)
+
+tags:
+  - name: Health
+    description: Server health check
+  - name: Auth
+    description: Token-based authentication
+  - name: Booking
+    description: CRUD operations on hotel bookings
+
+components:
+  securitySchemes:
+    TokenCookie:
+      type: apiKey
+      in: cookie
+      name: token
+      description: Cookie-based token from POST /auth
+
+  schemas:
+
+    AuthRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: password123
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: abc123def456
+
+    BookingDates:
+      type: object
+      required: [checkin, checkout]
+      properties:
+        checkin:
+          type: string
+          format: date
+          example: "2024-01-01"
+        checkout:
+          type: string
+          format: date
+          example: "2024-01-07"
+
+    Booking:
+      type: object
+      required: [firstname, lastname, totalprice, depositpaid, bookingdates]
+      properties:
+        firstname:
+          type: string
+          example: James
+        lastname:
+          type: string
+          example: Brown
+        totalprice:
+          type: integer
+          example: 450
+        depositpaid:
+          type: boolean
+          example: true
+        bookingdates:
+          $ref: '#/components/schemas/BookingDates'
+        additionalneeds:
+          type: string
+          example: Breakfast
+
+    BookingWithId:
+      type: object
+      properties:
+        bookingid:
+          type: integer
+          example: 1
+        booking:
+          $ref: '#/components/schemas/Booking'
+
+    BookingIdOnly:
+      type: object
+      properties:
+        bookingid:
+          type: integer
+          example: 1
+
+    BookingIdList:
+      type: array
+      items:
+        $ref: '#/components/schemas/BookingIdOnly'
+
+    PartialBooking:
+      type: object
+      properties:
+        firstname:
+          type: string
+          example: James
+        lastname:
+          type: string
+          example: Brown
+        totalprice:
+          type: integer
+          example: 550
+        depositpaid:
+          type: boolean
+          example: true
+        bookingdates:
+          $ref: '#/components/schemas/BookingDates'
+        additionalneeds:
+          type: string
+          example: Breakfast
+
+paths:
+
+  # ── Health ────────────────────────────────
+
+  /ping:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: healthCheck
+      description: >
+        Returns HTTP 201 if the API is up.
+        Use this as the first check in every JMeter test run.
+      responses:
+        '201':
+          description: API is alive
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Created
+
+  # ── Auth ──────────────────────────────────
+
+  /auth:
+    post:
+      tags: [Auth]
+      summary: Create authentication token
+      operationId: createToken
+      description: >
+        Returns a token string used for protected endpoints.
+        Pass as Cookie: token=<value> on PUT, PATCH, DELETE requests.
+        Credentials: username=admin, password=password123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+            example:
+              username: admin
+              password: password123
+      responses:
+        '200':
+          description: Token created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '200 (bad creds)':
+          description: Invalid credentials still returns 200 but with reason field
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reason:
+                    type: string
+                    example: Bad credentials
+
+  # ── Booking ───────────────────────────────
+
+  /booking:
+    get:
+      tags: [Booking]
+      summary: Get all booking IDs
+      operationId: getBookings
+      description: >
+        Returns a list of all booking IDs.
+        Optionally filter by firstname, lastname, or checkin/checkout dates.
+      parameters:
+        - name: firstname
+          in: query
+          schema:
+            type: string
+          example: James
+        - name: lastname
+          in: query
+          schema:
+            type: string
+          example: Brown
+        - name: checkin
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-01-01"
+        - name: checkout
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-01-07"
+      responses:
+        '200':
+          description: Array of booking IDs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingIdList'
+
+    post:
+      tags: [Booking]
+      summary: Create a new booking
+      operationId: createBooking
+      description: >
+        Creates a new booking record.
+        Returns the full booking with its assigned ID.
+        No auth required to create.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+            example:
+              firstname: James
+              lastname: Brown
+              totalprice: 450
+              depositpaid: true
+              bookingdates:
+                checkin: "2024-06-01"
+                checkout: "2024-06-07"
+              additionalneeds: Breakfast
+      responses:
+        '200':
+          description: Booking created with assigned ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingWithId'
+
+  /booking/{id}:
+    get:
+      tags: [Booking]
+      summary: Get booking by ID
+      operationId: getBookingById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Booking detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+
+    put:
+      tags: [Booking]
+      summary: Full update of a booking
+      operationId: updateBooking
+      description: Replaces all booking fields. Requires auth token cookie.
+      security:
+        - TokenCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '200':
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '403':
+          description: Forbidden — missing or invalid token
+        '405':
+          description: Method not allowed (intentional bug in some IDs)
+
+    patch:
+      tags: [Booking]
+      summary: Partial update of a booking
+      operationId: partialUpdateBooking
+      description: Updates only provided fields. Requires auth token cookie.
+      security:
+        - TokenCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartialBooking'
+            example:
+              firstname: James
+              totalprice: 600
+      responses:
+        '200':
+          description: Partially updated booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '403':
+          description: Forbidden
+
+    delete:
+      tags: [Booking]
+      summary: Delete a booking
+      operationId: deleteBooking
+      description: >
+        Deletes booking by ID. Requires auth token cookie.
+        NOTE: Returns 201 (not 204) — this is an intentional bug in the API.
+      security:
+        - TokenCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Deleted (intentional bug — should be 204)
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Created
+        '403':
+          description: Forbidden
+        '404':
+          description: Booking not found
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PERFORMANCE TESTING NOTES
+# ─────────────────────────────────────────────────────────────────────────────
+# Recommended JMeter test scenarios:
+#
+# Scenario 1 — Read-heavy (GET)
+#   Thread group: 50 users, 60s ramp-up, 5 min hold
+#   Samplers: GET /ping → GET /booking → GET /booking/{id}
+#   SLA: p95 < 800ms, error rate < 1%
+#
+# Scenario 2 — Write-heavy (POST/PUT/DELETE)
+#   Thread group: 20 users, 30s ramp-up, 3 min hold
+#   Samplers: POST /auth → POST /booking → PUT /booking/{id} → DELETE /booking/{id}
+#   SLA: p95 < 1200ms, error rate < 2%
+#
+# Scenario 3 — Spike test
+#   Thread group: ramp 5→100→5 users in 2 minutes
+#   Target: GET /booking (read endpoint)
+#   Watch for: error rate spike, latency degradation
+#
+# Known intentional bugs to detect via assertions:
+#   - DELETE returns 201 instead of 204
+#   - Some GETs return 418 I'm a teapot (random)
+#   - Filter by date is unreliable (bug)
+# ─────────────────────────────────────────────────────────────────────────────

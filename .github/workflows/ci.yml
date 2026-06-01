@@ -135,8 +135,8 @@ jobs:
           fi
 
       # ── Run performance tests ───────────────────────────────────────────────
-      # PERF_AGENT_URL → set in GitHub Secrets (your ngrok or server URL)
-      # API_AUTH_PASSWORD → set in GitHub Secrets
+      # Service selection is configured in perf-config.yaml (run_services field)
+      # No need to touch this step — devs edit perf-config.yaml instead
       - name: Run performance tests
         id: perf_run
         env:

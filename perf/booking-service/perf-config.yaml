@@ -1,0 +1,21 @@
+# perf/booking-service/perf-config.yaml
+team:
+  name: "booking-service"
+
+api:
+  base_url      : "https://restful-booker.herokuapp.com"
+  spec_file     : "perf/booking-service/openapi.yaml"
+  auth_username : "admin"
+
+profile: "baseline"
+
+load:
+  threads     : 1
+  ramp_up_sec : 1
+  duration_sec: 60
+
+sla:
+  p95_ms         : 2000
+  p99_ms         : 4000
+  error_rate_pct : 5.0
+  throughput_min : 0.5

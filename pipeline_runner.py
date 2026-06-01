@@ -434,6 +434,97 @@ def run_pipeline(config_file: str,
     sys.exit(0 if overall == "PASS" else 1)
 
 
+# ─── Multi-spec runner ────────────────────────────────────────────────────────
+
+def run_all_pipelines(configs_dir: str,
+                      services: list = None,
+                      profile_override: str = None,
+                      force_regenerate: bool = False,
+                      dry_run: bool = False):
+    """
+    Discover all perf-config.yaml files under a directory and run
+    one pipeline job per config. Optionally filter by service name.
+
+    services = None        → run ALL services found
+    services = ["booking"] → run only booking-service
+    services = ["booking", "user"] → run only those two
+    """
+    configs_path = Path(configs_dir)
+    all_configs  = sorted(configs_path.rglob("perf-config.yaml"))
+
+    if not all_configs:
+        print(f"[multi] No perf-config.yaml files found under: {configs_dir}")
+        sys.exit(1)
+
+    # ── Filter by selected services ───────────────────────────────────────
+    if services:
+        # Normalise to lowercase for case-insensitive matching
+        selected     = [s.lower().strip() for s in services]
+        config_files = [
+            c for c in all_configs
+            if any(sel in c.parent.name.lower() for sel in selected)
+        ]
+        if not config_files:
+            print(f"[multi] No matching services found for: {services}")
+            print(f"[multi] Available services:")
+            for c in all_configs:
+                print(f"         - {c.parent.name}")
+            sys.exit(1)
+
+        skipped = [c.parent.name for c in all_configs if c not in config_files]
+        if skipped:
+            print(f"[multi] Skipping: {', '.join(skipped)}")
+    else:
+        config_files = all_configs
+
+    print("=" * 65)
+    print(f"  MULTI-SERVICE PERFORMANCE PIPELINE")
+    print(f"  Running {len(config_files)} of {len(all_configs)} service(s)")
+    if services:
+        print(f"  Filter : {', '.join(services)}")
+    print("=" * 65)
+
+    results = []
+
+    for config_file in config_files:
+        service = config_file.parent.name
+        print(f"\n{'─'*65}")
+        print(f"  Running: {service}  ({config_file})")
+        print(f"{'─'*65}")
+
+        try:
+            run_pipeline(
+                config_file      = str(config_file),
+                profile_override = profile_override,
+                force_regenerate = force_regenerate,
+                dry_run          = dry_run,
+            )
+            results.append((service, "PASS"))
+        except SystemExit as e:
+            status = "PASS" if e.code == 0 else "FAIL"
+            results.append((service, status))
+        except Exception as e:
+            print(f"[multi] ERROR in {service}: {e}")
+            results.append((service, "ERROR"))
+
+    # ── Consolidated summary ──────────────────────────────────────────────
+    print("\n" + "=" * 65)
+    print("  MULTI-SERVICE SUMMARY")
+    print("=" * 65)
+    overall_pass = True
+    for service, status in results:
+        icon = "✅" if status == "PASS" else "❌"
+        print(f"  {icon}  {service:<30} {status}")
+        if status != "PASS":
+            overall_pass = False
+
+    print("=" * 65)
+    print(f"  OVERALL: {'PASS — all services met SLA' if overall_pass else 'FAIL — one or more services violated SLA'}")
+    print("=" * 65)
+
+    sys.exit(0 if overall_pass else 1)
+
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -441,18 +532,39 @@ if __name__ == "__main__":
         description="Performance Testing Pipeline Runner"
     )
     parser.add_argument("--config", default="perf-config.yaml",
-                        help="Path to perf-config.yaml")
+                        help="Path to master perf-config.yaml")
     parser.add_argument("--profile", default=None,
                         choices=["baseline", "load", "stress", "spike", "soak"],
-                        help="Override load profile from perf-config.yaml")
+                        help="Override load profile for all services")
     parser.add_argument("--force-regenerate", action="store_true",
                         help="Force JMX regeneration even if spec unchanged")
     parser.add_argument("--dry-run", action="store_true",
                         help="Skip JMeter — test AI analysis layer only")
     args = parser.parse_args()
 
-    run_pipeline(
-        config_file      = args.config,
+    # ── Read master config ────────────────────────────────────────────────
+    master_cfg   = load_config(args.config)
+    services_dir = master_cfg.get("services_dir", "perf")
+    run_services = master_cfg.get("run_services") or []
+
+    # Normalise run_services — could be None, [], or a list of names
+    if isinstance(run_services, str):
+        run_services = [s.strip() for s in run_services.split(",") if s.strip()]
+
+    # ── Validate services_dir exists ──────────────────────────────────────
+    if not Path(services_dir).is_dir():
+        print(f"[pipeline] ERROR: services_dir '{services_dir}' not found.")
+        print(f"[pipeline] Create a perf/ folder with one subfolder per service.")
+        print(f"[pipeline] Each subfolder needs: openapi.yaml + perf-config.yaml")
+        sys.exit(1)
+
+    print(f"[pipeline] services_dir : {services_dir}")
+    print(f"[pipeline] run_services : {run_services if run_services else 'ALL'}")
+
+    # ── Run all selected services ─────────────────────────────────────────
+    run_all_pipelines(
+        configs_dir      = services_dir,
+        services         = run_services if run_services else None,
         profile_override = args.profile,
         force_regenerate = args.force_regenerate,
         dry_run          = args.dry_run,

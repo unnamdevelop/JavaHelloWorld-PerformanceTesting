@@ -1,53 +1,29 @@
 # ══════════════════════════════════════════════════════════════
-# perf-config.yaml
-# Performance testing configuration for hello-world-java project.
-# Maintained by the dev team in their own repo.
-# Points to restful-booker.herokuapp.com as the test target API.
+# perf-config.yaml — Master Performance Config
+#
+# This is the ONLY file the dev team needs to edit.
+# CI pipeline always reads this file — never needs to change.
+#
+# HOW TO CONFIGURE SERVICES:
+#   services_dir → folder containing per-service configs
+#   run_services → which services to run
+#                  blank or omit  = run ALL services
+#                  list of names  = run only those services
+#
+# EXAMPLES:
+#   run_services:                    ← run ALL services
+#   run_services: [booking-service]  ← run one only
+#   run_services: [booking-service, user-service]  ← run two
 # ══════════════════════════════════════════════════════════════
 
-team:
-  name: "hello-world-team"
+# Folder containing per-service configs
+services_dir: "perf"
 
-api:
-  # Target API for performance testing
-  base_url: "https://restful-booker.herokuapp.com"
-
-  # Spec file — lives in THIS repo, not on the server
-  # pipeline_runner.py reads this file, computes SHA256 hash
-  # for change detection, and sends content to perf agent
-  # No server-side spec dependency — fully self-contained
-  spec_file: "openapi.yaml"
-
-  # Auth credentials for restful-booker
-  auth_username: "admin"
-
-# Load profile — baseline first (Golden Rule 1)
-# Change to 'load' after baseline passes
-profile: "baseline"
-
-# Load settings
-load:
-  threads     : 1       # single user for baseline
-  ramp_up_sec : 1
-  duration_sec: 60
-
-# SLA thresholds — set BEFORE testing (Golden Rule 3)
-sla:
-  p95_ms         : 2000
-  p99_ms         : 4000
-  error_rate_pct : 5.0
-  throughput_min : 0.5
-
-# Certificate config — not needed for restful-booker
-certs:
-  skip_ssl_verify: false
-
-# Notification — optional Slack webhook
-notify:
-  webhook_url: null
+# Which services to run — blank means ALL
+run_services:
+  # - booking-service
+   - user-service
 
 # Performance agent service URL
-# Set this as GitHub Secret: PERF_AGENT_URL
-# For local testing: http://localhost:8000
-# For ngrok tunnel : https://xxxx.ngrok-free.app
+# Set as GitHub Secret: PERF_AGENT_URL
 service_url: "http://localhost:8000"
