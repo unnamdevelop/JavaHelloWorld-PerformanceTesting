@@ -157,29 +157,15 @@ jobs:
           name: perf-report-${{ github.run_number }}
           path: perf-results/
           retention-days: 30
-
       # ── Add rich report summary to GitHub Actions summary page ───────────────
       - name: Add to job summary
         if: always()
         run: |
-          # Check if pipeline_runner generated the summary file
           if [ -f "perf-results/github_summary.md" ]; then
-            echo "Summary file found — writing to GitHub Step Summary"
             cat perf-results/github_summary.md >> $GITHUB_STEP_SUMMARY
-
-          elif ls perf-results/*.md 1>/dev/null 2>&1; then
-            # Fallback — use raw markdown report
-            REPORT=$(ls perf-results/*.md | grep -v github_summary | head -1)
-            echo "Using raw report: $REPORT"
-            echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            cat "$REPORT" >> $GITHUB_STEP_SUMMARY
-
           else
             echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             echo "❌ No report found. Check the Run performance tests step." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             ls -la perf-results/ 2>/dev/null || echo "perf-results folder missing"
           fi
 

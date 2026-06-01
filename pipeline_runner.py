@@ -406,16 +406,14 @@ def run_pipeline(config_file: str,
     state = wait_for_job(service_url, job_id, max_wait_sec=max_wait)
 
     # ── Download reports ──────────────────────────────────────────────────
-    output_dir = ROOT / "perf-results"
+    output_dir = ROOT / "perf-results" / cfg.get("team", {}).get("name", job_id)
     if state.get("status") == "completed":
         download_reports(service_url, job_id, output_dir)
 
-        # ── Update spec hash after successful run ─────────────────────────
         if payload.get("regenerate_jmx") and spec_path.exists():
             store_hash(get_spec_hash(spec_path))
             print(f"[pipeline] Spec hash updated — JMX is current")
 
-        # ── Generate GitHub Actions Summary file ──────────────────────────
         generate_github_summary(service_url, job_id, state, cfg, output_dir)
 
     # ── Final verdict ─────────────────────────────────────────────────────
@@ -522,6 +520,28 @@ def run_all_pipelines(configs_dir: str,
     print(f"  OVERALL: {'PASS — all services met SLA' if overall_pass else 'FAIL — one or more services violated SLA'}")
     print("=" * 65)
 
+    # ── Merge all per-service github_summary.md into one file ────────────
+    merged_summary = ROOT / "perf-results" / "github_summary.md"
+    merged_summary.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(merged_summary, "w", encoding="utf-8") as out:
+        # Overall header
+        overall_icon = "✅" if overall_pass else "❌"
+        out.write(f"# {overall_icon} Multi-Service Performance Results\n\n")
+        out.write(f"| Service | Result |\n")
+        out.write(f"|---------|--------|\n")
+        for service, status in results:
+            icon = "✅" if status == "PASS" else "❌"
+            out.write(f"| `{service}` | {icon} {status} |\n")
+        out.write("\n---\n\n")
+
+        # Append each service's individual summary
+        for service, status in results:
+            service_summary = ROOT / "perf-results" / service / "github_summary.md"
+            if service_summary.exists():
+                out.write(f"\n{service_summary.read_text(encoding='utf-8')}\n\n---\n")
+
+    print(f"[multi] Merged summary: {merged_summary}")
     sys.exit(0 if overall_pass else 1)
 
 
