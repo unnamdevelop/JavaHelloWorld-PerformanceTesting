@@ -207,6 +207,7 @@ def generate_github_summary(service_url: str, job_id: str,
     violations = state.get("violations", 0)
     profile    = cfg.get("profile", "baseline")
     base_url   = cfg.get("api", {}).get("base_url", "")
+    team_name  = cfg.get("team", {}).get("name", "unknown-service")
 
     # ── Emoji indicators ──────────────────────────────────────────────────
     overall_emoji = "✅" if overall == "PASS" else "❌"
@@ -258,9 +259,9 @@ def generate_github_summary(service_url: str, job_id: str,
     # ── Build summary markdown ────────────────────────────────────────────
     lines = []
 
-    # Header
+    # Header — includes service name
     lines += [
-        f"# {overall_emoji} Performance Test Report — {badge}",
+        f"# {overall_emoji} Performance Test Report — {team_name} — {badge}",
         "",
         f"| | |",
         f"|---|---|",
