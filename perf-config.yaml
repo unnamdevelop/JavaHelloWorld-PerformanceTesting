@@ -21,7 +21,7 @@ services_dir: "perf"
 
 # Which services to run — blank means ALL
 run_services:
-  # - booking-service
+   - booking-service
    - user-service
 
 # Performance agent service URL
